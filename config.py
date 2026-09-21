@@ -43,10 +43,12 @@ TOP_K = 5               # how many chunks to pull back per question
 #
 # LOWER IS BETTER: 0.3 is a close match, 0.9 is unrelated.
 #
-# 0.6 is a reasonable starting point, not a right answer. Milestone 4 has you
-# measure your own two groups of distances and put the cutoff in the gap.
-# Most corpora land somewhere between 0.45 and 0.75.
-THRESHOLD = 0.6
+# Measured on campus_life with `python app.py retrieve` (Milestone 4): the 5
+# QUESTIONS in questions.py came back with best distances of 0.194-0.345, and
+# the 5 OUT_OF_SCOPE questions came back at 0.825-0.934. Nothing landed in
+# between, so 0.585 (the midpoint of that gap) is the cutoff — not the 0.6
+# starter default, which only happened to also sit inside the gap.
+THRESHOLD = 0.585
 
 
 # ─── Models ──────────────────────────────────────────────────────────────────
