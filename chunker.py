@@ -1,25 +1,14 @@
 """
 Stage 2 of the pipeline: splitting documents into chunks.
 
-⚠️ THIS IS THE FILE YOU CHANGE IN MILESTONE 3.
+`split_documents` merges each document's paragraphs into a chunk up to
+CHUNK_SIZE, only splitting where a paragraph break already is one. See its
+docstring for why that fits campus_life specifically.
 
-`split_documents` below is deliberately plain. It cuts every document into
-fixed-size pieces with a fixed overlap and pays no attention to where sentences
-or paragraphs end. It works, and it is not good.
-
-On a corpus of short posts it may not cut anything at all: `campus_life` comes
-out as 88 documents and 88 chunks, because almost nothing in it reaches 800
-characters. That is the baseline, not a bug — Milestone 3 is where you decide
-whether one post should stay one chunk.
-
-Your job in Milestone 3 is to replace the *body* of `split_documents` with a
-strategy that fits the documents you actually read in Milestone 1. Keep the
-name and the shape of what it returns — the rest of the pipeline calls it, and
-your README has to name the function that produced your chunks.
-
-If you get stuck for 30 minutes, `fallback_split` is the original. Switch back
-to it, write down what you saw, and move on. That's a real observation about
-your pipeline, not giving up.
+`fallback_split` is the starter's original: fixed-size character windows with
+a fixed overlap, blind to sentence or paragraph boundaries. It's kept as the
+thing to fall back to (and to compare against) if the paragraph-merge
+strategy above ever gets stuck on a corpus it doesn't fit.
 """
 
 from dataclasses import dataclass
@@ -82,22 +71,70 @@ def fallback_split(
 
 def split_documents(documents: list[Document]) -> list[Chunk]:
     """
-    Split documents into chunks. ⚠️ REPLACE THE BODY OF THIS IN MILESTONE 3.
+    Split documents into chunks, merging whole paragraphs up to CHUNK_SIZE.
 
-    Right now it just calls the fallback. That is the plain, generic behaviour
-    the brief is talking about.
+    campus_life is 88 short, single-topic notes — the longest is 563
+    characters (checked with `wc -c corpora/campus_life/documents/*.txt`),
+    every idea in a post lives in one or two paragraphs, and there's no
+    internal section structure to split on. Cutting one of these on a
+    character count risks slicing a sentence in half for no benefit, since
+    almost none of them are long enough to need splitting at all.
 
-    When you write your own strategy, set `produced_by` to
-    "chunker.py::split_documents" so your README's Sample Chunks section names
-    the right function. `app.py chunks` prints that string for you.
-
-    Things worth thinking about before you write any code:
-      - Are your documents short posts or long guides?
-      - Is the useful information in one sentence, or spread over a paragraph?
-      - Would splitting on paragraph breaks keep more thoughts intact than
-        splitting on a character count?
+    So the rule is: merge a document's paragraphs into a chunk as long as the
+    result still fits under CHUNK_SIZE, and start a new chunk when the next
+    paragraph would push it over. CHUNK_SIZE (1000) is set above the longest
+    document in this corpus on purpose, so in practice every post here stays
+    one chunk — a post never gets split unless it or a paragraph is genuinely
+    too long to fit. The one paragraph that IS too long on its own falls back
+    to the fixed-window split with overlap, so a single run-on paragraph
+    still doesn't turn into one giant chunk.
     """
-    return fallback_split(documents)
+    chunk_size = config.CHUNK_SIZE
+    overlap = config.CHUNK_OVERLAP
+    chunks: list[Chunk] = []
+
+    for doc in documents:
+        paragraphs = [p.strip() for p in doc.text.split("\n\n") if p.strip()]
+        index = 0
+        current = ""
+
+        def flush(piece: str) -> None:
+            nonlocal index
+            piece = piece.strip()
+            if not piece:
+                return
+            chunks.append(
+                Chunk(
+                    text=piece,
+                    source=doc.source,
+                    index=index,
+                    produced_by="chunker.py::split_documents",
+                )
+            )
+            index += 1
+
+        for para in paragraphs:
+            if len(para) > chunk_size:
+                # A single paragraph too long to keep whole. Flush whatever
+                # was building, then window this one paragraph on its own.
+                flush(current)
+                current = ""
+                start = 0
+                while start < len(para):
+                    flush(para[start : start + chunk_size])
+                    start += chunk_size - overlap
+                continue
+
+            candidate = f"{current}\n\n{para}" if current else para
+            if len(candidate) <= chunk_size:
+                current = candidate
+            else:
+                flush(current)
+                current = para
+
+        flush(current)
+
+    return chunks
 
 
 def describe(chunks: list[Chunk]) -> str:

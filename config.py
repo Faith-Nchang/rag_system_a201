@@ -24,11 +24,14 @@ CORPUS = os.getenv("AI201_CORPUS", "campus_life")
 
 
 # ─── Chunking (Milestone 3) ──────────────────────────────────────────────────
-# These are deliberately plain, generic numbers. Milestone 3 is where you
-# replace them with numbers that fit the documents you actually read.
+# campus_life is 88 short, single-topic notes — the longest is 563 characters
+# (`wc -c corpora/campus_life/documents/*.txt`). CHUNK_SIZE is set above that
+# on purpose, so split_documents() only cuts a document when a paragraph
+# genuinely forces it, not as a round number picked in the abstract.
+# CHUNK_OVERLAP only matters on that fallback path — see chunker.py.
 
-CHUNK_SIZE = 800        # characters per chunk
-CHUNK_OVERLAP = 120     # characters shared between neighbouring chunks
+CHUNK_SIZE = 1000       # characters per chunk
+CHUNK_OVERLAP = 150     # characters shared between neighbouring chunks
 
 
 # ─── Retrieval (Milestone 4) ─────────────────────────────────────────────────
